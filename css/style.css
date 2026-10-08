@@ -24,7 +24,7 @@
 
 * { box-sizing: border-box; }
 
-html, body, #app { inline-size: 100%; block-size: 100%; }
+html, body, #app { inline-size: 100%; min-block-size: 100%; }
 
 body {
   margin: 0;
@@ -32,12 +32,11 @@ body {
   color: var(--text);
   font: 400 var(--fs-m)/1.25 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 [hidden] { display: none !important; }
 
-.app-shell { overflow: hidden; }
 
 /* ---------------------------------------------------------------- focus */
 
@@ -48,12 +47,20 @@ body {
 
 /* ---------------------------------------------------------------- layout */
 
+/* The page itself scrolls (no scrolling box nested inside the screen). The glasses' directional
+   navigation can't hop from a control outside a nested scroller to one inside it, which left focus
+   stuck on the first control. The top bar simply stays pinned while the page scrolls under it. */
 .screen {
-  display: flex;
-  flex-direction: column;
+  display: block;
   inline-size: 100%;
-  block-size: 100%;
-  min-block-size: 0;
+  min-block-size: 100vh;
+}
+
+.screen > .bar, .screen > .top {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 5;
+  background: var(--bg);
 }
 
 .bar {
@@ -78,17 +85,16 @@ body {
 .logo { display: inline-flex; color: var(--accent); flex: none; }
 .logo .ico { inline-size: 1.5em; block-size: 1.5em; }
 
-.scroll {
-  flex: 1 1 auto;
-  min-block-size: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-  /* soft fade at the bottom hints that there is more below */
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
+/* soft fade at the bottom edge hints that there is more below */
+.app-shell::after {
+  content: "";
+  position: fixed;
+  inset: auto 0 0 0;
+  block-size: 28px;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+  pointer-events: none;
+  z-index: 6;
 }
-.scroll::-webkit-scrollbar { display: none; }
 
 .grid {
   display: grid;
@@ -124,6 +130,8 @@ body {
 .ico { display: inline-flex; inline-size: 1.2em; block-size: 1.2em; }
 .ico svg { inline-size: 100%; block-size: 100%; }
 .btn:disabled { opacity: 0.6; }
+
+.search-btn { margin-inline-start: auto; flex: none; }
 
 .search {
   appearance: none;
@@ -190,12 +198,9 @@ body {
 .chips {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
   padding: 6px var(--pad) 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  flex: none;
 }
-.chips::-webkit-scrollbar { display: none; }
 .chip {
   appearance: none;
   flex: none;
@@ -311,7 +316,7 @@ body {
 
 /* ----------------------------------------------------------------- player */
 
-.player { position: fixed; inset: 0; background: #000; overflow: hidden; }
+.player { position: fixed; inset: 0; z-index: 10; background: #000; overflow: hidden; }
 .video { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; object-fit: contain; background: #000; }
 
 .status {
