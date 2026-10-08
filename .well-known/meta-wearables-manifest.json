@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "name": "Matinee",
+  "description": "Classic films from the Internet Archive, tidied up and sorted for your glasses.",
+  "appearance": {
+    "theme_color": "#FFB547",
+    "icon": {
+      "src": "../icons/icon.svg",
+      "type": "monochrome"
+    }
+  }
+}
