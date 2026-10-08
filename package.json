@@ -1,0 +1,11 @@
+{
+  "name": "matinee",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Classic films from the Internet Archive for Meta Ray-Ban Display glasses.",
+  "scripts": {
+    "test": "node --test",
+    "serve": "python3 -m http.server 8080"
+  }
+}
