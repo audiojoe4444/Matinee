@@ -3,8 +3,10 @@
 // and Matinee never goes deeper than 4: home > shelf > film > player).
 
 import { screens } from './ui.js';
+import { installDirectionalFocus } from './focus.js';
 
 const root = document.getElementById('app');
+installDirectionalFocus(root);
 const HOME = { screen: 'home' };
 
 const memory = new Map(); // per-screen scroll position + focused item, restored on Back
