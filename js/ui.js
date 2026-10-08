@@ -33,6 +33,7 @@ const ICONS = {
   pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></svg>',
   replay: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5a7 7 0 1 1-6.7 9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M4 4v6h6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M15 15l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>',
   logo: '<svg viewBox="0 0 64 64" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M12 10h40a4 4 0 0 1 4 4v36a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4V14a4 4 0 0 1 4-4zM15 16v6h6v-6h-6zm0 13v6h6v-6h-6zm0 13v6h6v-6h-6zM43 16v6h6v-6h-6zm0 13v6h6v-6h-6zm0 13v6h6v-6h-6zM27 22.5v19L43 32l-16-9.5z"/></svg>',
 };
 const icon = (name) => h('span', { class: 'ico', html: ICONS[name] });
@@ -74,13 +75,22 @@ function notice(message, actionLabel, onAction, key = 'retry') {
     actionLabel && h('button', { class: 'btn', type: 'button', dataset: { key }, onclick: onAction, text: actionLabel }));
 }
 
-// A search field fires `change` when the glasses' composer commits text, but browsers also fire it
-// as a side effect of blur - including while a screen is being swapped out. So: wait a tick, and
-// ignore it if the field has already left the page (otherwise Back could trigger a stray search).
-function onCommit(input, handler) {
-  input.addEventListener('change', () => {
-    setTimeout(() => { if (input.isConnected) handler(input.value.trim()); }, 0);
-  });
+// The glasses' composer hands text back through `input` and `change` events (Meta's docs: `change`
+// only fires once the field loses focus). So: react to either - `input` after a short pause, `change`
+// straight away - and wait a tick before acting, because browsers also fire `change` as a side effect
+// of blur while a screen is being swapped out. Ignore it if the field has already left the page.
+function onCommit(input, handler, wait = 700) {
+  let last = input.value.trim();
+  let timer = 0;
+  const run = () => {
+    if (!input.isConnected) return;
+    const q = input.value.trim();
+    if (!q || q === last) return;
+    last = q;
+    handler(q);
+  };
+  input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(run, wait); });
+  input.addEventListener('change', () => { clearTimeout(timer); timer = setTimeout(run, 0); });
 }
 
 function focusKey(root, key) {
@@ -91,14 +101,12 @@ function focusKey(root, key) {
 /* ------------------------------------------------------------------ home */
 
 function homeScreen(state, nav) {
-  const search = h('input', {
-    type: 'search', class: 'search', placeholder: 'Search films', 'aria-label': 'Search films',
-    enterkeyhint: 'search', autocomplete: 'off', dataset: { key: 'search' },
-  });
-  onCommit(search, (q) => {
-    search.value = '';
-    if (q) nav.push({ screen: 'search', q });
-  });
+  // No text field on the home screen: a focused text field can swallow directional input on the
+  // glasses, so typing lives on its own Search screen and this is just a button.
+  const search = h('button', {
+    class: 'btn search-btn', type: 'button', 'aria-label': 'Search films', dataset: { key: 'search' },
+    onclick: () => nav.push({ screen: 'search', q: '' }),
+  }, icon('search'), 'Search');
 
   const grid = h('div', { class: 'grid tiles' });
   const recents = A.recent.get();
@@ -210,8 +218,7 @@ function shelfScreen(state, nav) {
   }
 
   const el = h('section', { class: 'screen', dataset: { screen: 'shelf' } },
-    header({ title: shelf.title, extra: sortBtn }),
-    chips,
+    h('div', { class: 'top' }, header({ title: shelf.title, extra: sortBtn }), chips),
     h('div', { class: 'scroll' }, grid));
   el.onMount = async () => {
     if (cursor.items.length) paint();
@@ -226,14 +233,17 @@ function searchScreen(state, nav) {
   const input = h('input', {
     type: 'search', class: 'search', value: state.q, placeholder: 'Search films', 'aria-label': 'Search films',
     enterkeyhint: 'search', autocomplete: 'off', dataset: { key: 'search' },
+    ...(state.q ? {} : { 'data-autofocus': '' }),
   });
-  onCommit(input, (q) => {
-    if (q && q !== state.q) nav.replace({ screen: 'search', q }, null);
-  });
+  onCommit(input, (q) => nav.replace({ screen: 'search', q }, null));
   const grid = h('div', { class: 'grid cards' });
   const open = (item) => nav.push({ screen: 'detail', id: item.id });
 
   async function load() {
+    if (!state.q) {
+      grid.replaceChildren(notice('Pinch the box above, then write or speak a film title, actor or director.'));
+      return;
+    }
     grid.replaceChildren(...skeletons(4));
     try {
       const results = await A.searchFilms(state.q);

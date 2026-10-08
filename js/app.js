@@ -3,10 +3,8 @@
 // and Matinee never goes deeper than 4: home > shelf > film > player).
 
 import { screens } from './ui.js';
-import { installDirectionalFocus } from './focus.js';
 
 const root = document.getElementById('app');
-installDirectionalFocus(root);
 const HOME = { screen: 'home' };
 
 const memory = new Map(); // per-screen scroll position + focused item, restored on Back
@@ -17,10 +15,9 @@ const keyOf = (s) => JSON.stringify([s.screen, s.id ?? '', s.q ?? '', s.decade ?
 
 function remember() {
   if (!current) return;
-  const scroller = current.el.querySelector('.scroll');
   const active = document.activeElement;
   memory.set(keyOf(current.state), {
-    scroll: scroller ? scroller.scrollTop : 0,
+    scroll: window.scrollY,
     focus: active && current.el.contains(active) ? active.dataset.key ?? null : null,
   });
 }
@@ -41,10 +38,16 @@ export const nav = {
   },
 };
 
+// Focus is scrolled into view by the browser; tell it how much the pinned bar and the bottom fade cover.
+function keepFocusClearOfBar(el) {
+  const bar = el.querySelector(':scope > .bar, :scope > .top');
+  document.documentElement.style.scrollPaddingTop = bar ? `${bar.offsetHeight + 8}px` : '0px';
+  document.documentElement.style.scrollPaddingBottom = '36px'; // clear of the fade along the bottom edge
+}
+
 function restore(el, state) {
   const saved = memory.get(keyOf(state));
-  const scroller = el.querySelector('.scroll');
-  if (saved && scroller) scroller.scrollTop = saved.scroll;
+  if (saved) window.scrollTo(0, saved.scroll);
   let target = null;
   if (saved?.focus) target = [...el.querySelectorAll('[data-key]')].find((n) => n.dataset.key === saved.focus);
   target ??= el.querySelector('[data-autofocus]') ?? el.querySelector('.scroll button, .scroll input');
@@ -58,6 +61,8 @@ async function render(state) {
   const el = build(state, nav);
   current = { el, state };
   root.replaceChildren(el);
+  window.scrollTo(0, 0);
+  keepFocusClearOfBar(el);
   try {
     await el.onMount?.();
   } catch (err) {
